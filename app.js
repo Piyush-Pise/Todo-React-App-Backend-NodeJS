@@ -6,15 +6,29 @@ const cors = require("cors");
 
 const app = express();
 
-app.use(
-  cors({
-    origin: "*",
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: "http://localhost:5173",
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
+
+// app.use((req, res, next) => {
+//   res.header("Access-Control-Allow-Origin", "http://localhost:5173/get");
+//   // res.header("Access-Control-Allow-Origin", "http://localhost:5173/add");
+//   // res.header("Access-Control-Allow-Origin", "http://localhost:5173/updatestatus");
+//   // res.header("Access-Control-Allow-Origin", "http://localhost:5173/deleteTodo");
+//   res.header("Access-Control-Allow-Credentials", true);
+//   res.header(
+//     "Access-Control-Allow-Headers",
+//     "Origin, X-Requested-With, Content-Type, Accept"
+//   );
+//   next();
+// });
 
 const PORT = process.env.PORT || 8080;
 const MongodbURI =
