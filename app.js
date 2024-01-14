@@ -8,7 +8,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:5173", // Replace with your React app's origin
+    origin: "*",
     credentials: true,
   })
 );
