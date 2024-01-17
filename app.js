@@ -1,286 +1,263 @@
 const express = require("express");
-const mongoose = require("mongoose");
+const Todo = require("./schema/Todo");
 const bodyParser = require("body-parser");
-const cookieParser = require("cookie-parser");
 const cors = require("cors");
 
+// const mongoose = require("mongoose");
+
 const app = express();
-
-const corsOptions = {
-  origin: "http://localhost:5173",
-  credentials: true,
-};
-
-app.use(cors(corsOptions));
+const PORT = process.env.PORT || 8080;
 
 app.use(bodyParser.json());
-app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+// {
+//   origin: "http://localhost:5173",
+//   credentials: true,
+// }
 
-// app.use((req, res, next) => {
-//   res.header("Access-Control-Allow-Origin", "http://localhost:5173/get");
-//   // res.header("Access-Control-Allow-Origin", "http://localhost:5173/add");
-//   // res.header("Access-Control-Allow-Origin", "http://localhost:5173/updatestatus");
-//   // res.header("Access-Control-Allow-Origin", "http://localhost:5173/deleteTodo");
-//   res.header("Access-Control-Allow-Credentials", true);
-//   res.header(
-//     "Access-Control-Allow-Headers",
-//     "Origin, X-Requested-With, Content-Type, Accept"
-//   );
-//   next();
-// });
-
-const PORT = process.env.PORT || 8080;
-const MongodbURI =
-  "mongodb+srv://ToDoAppUser:85oZtV0xJDzmhE3P@todoappcluster.yrf95cf.mongodb.net/?retryWrites=true&w=majority";
-
-const connectToDatabase = () => {
-  mongoose
-    .connect(MongodbURI)
-    .then(() => {
-      console.log("Connected to Monogodb database sucessfully!");
-
-      const Todo = mongoose.model("Todo", {
-        todos: [String],
-        completed: [Boolean],
-      });
-
-      async function getAllTodos(userID) {
-        try {
-          const result = await Todo.findById(userID, "todos completed");
-          return result
-            ? { todos: result.todos, completed: result.completed }
-            : null;
-        } catch (error) {
-          throw error;
-        }
-      }
-
-      async function createNewUser(newToDo) {
-        try {
-          const todo = new Todo({
-            todos: newToDo.todo,
-            completed: newToDo.completed,
-          });
-
-          const newTodo = await todo.save();
-          console.log("New User created !!!");
-          console.log(`${newTodo}`);
-          return newTodo._id;
-        } catch (error) {
-          console.error("Could not create new User !!!", error.message);
-          throw error;
-        }
-      }
-
-      async function addTodoForID(userId, todo) {
-        try {
-          const updatedUser = await Todo.findOneAndUpdate(
-            { _id: userId },
-            {
-              $push: { todos: todo.todo, completed: todo.completed },
-            },
-            { new: true, useFindAndModify: false }
-          );
-
-          if (!updatedUser) {
-            console.error("User not found");
-            return null;
-          }
-
-          console.log("Added Todo:", updatedUser);
-          return updatedUser;
-        } catch (err) {
-          console.error(err.message);
-          throw err;
-        }
-      }
-
-      async function updateStatus(userId, new_obj) {
-        try {
-          const result = await Todo.updateOne(
-            {
-              _id: userId,
-              completed: { $exists: true, $elemMatch: { $exists: true } },
-            },
-            { $set: { [`completed.${new_obj.index}`]: new_obj.status } }
-          );
-
-          if (result.nModified === 0) {
-            console.error("User not found or index not valid");
-            return null;
-          }
-
-          console.log("Updated status:", result);
-          return result;
-        } catch (err) {
-          console.error(err.message);
-          throw err;
-        }
-      }
-
-      async function deleteTodo(userId, indexes) {
-        try {
-          const Todo_obj = await getAllTodos(userId);
-          if (Todo_obj === null) {
-            return null;
-          }
-          indexes.sort((a, b) => b - a);
-
-          // Delete elements at the specified indexes
-          for (let index of indexes) {
-            Todo_obj.todos.splice(index, 1);
-            Todo_obj.completed.splice(index, 1);
-          }
-
-          Todo.findOneAndUpdate(
-            { _id: userId },
-            { todos: Todo_obj.todos, completed: Todo_obj.completed },
-            { new: true }
-          ).then((updatedDocument) => {
-            if (updatedDocument) {
-              console.log("Document updated successfully:", updatedDocument);
-              return updatedDocument;
-            } else {
-              console.log("Document not found.");
-              return null;
-            }
-          });
-        } catch (error) {
-          console.log(error.message);
-          return null;
-        }
-      }
-
-      app.get("/get", async (req, res) => {
-        try {
-          const userID = req.cookies.userID || "";
-
-          if (userID !== "") {
-            // User found
-            const data = await getAllTodos(userID);
-            if (data !== null) {
-              res
-                .status(201)
-                .json({ todos: data.todos, completed: data.completed });
-            } else {
-              // User not found
-              const userId = await createNewUser({ todo: [], completed: [] });
-              res.cookie("userID", userId, {
-                maxAge: 900000,
-                httpOnly: true,
-              });
-              // Return default response for a new user
-              res.status(201).json({ todos: [], completed: [] });
-            }
-          } else {
-            // User not found
-            const userId = await createNewUser({ todo: [], completed: [] });
-            res.cookie("userID", userId, {
-              maxAge: 900000,
-              httpOnly: true,
-            });
-            // Return default response for a new user
-            res.status(201).json({ todos: [], completed: [] });
-          }
-        } catch (e) {
-          console.error(e.message);
-          res.status(400).json({ todos: [], completed: [] });
-        }
-      });
-
-      app.post("/add", async (req, res) => {
-        try {
-          const userID = req.cookies.userID || "";
-          const newTodo = {
-            todo: [req.body.todo],
-            completed: [req.body.completed],
-          };
-          console.log("New Todo to add is:", newTodo);
-
-          // User not found
-          if (userID === "") {
-            // Create a new User + set user's cookies
-            const userId = await createNewUser(newTodo);
-            console.log("new uID: ", userId);
-            res.cookie("userID", userId, {
-              maxAge: 900000,
-              httpOnly: true,
-            });
-            res
-              .status(201)
-              .send(
-                "userID did not match, So created new userID for you and added your todo"
-              );
-            return;
-          }
-
-          const data = await addTodoForID(userID, newTodo);
-
-          if (data) {
-            console.log("New Todo added successfully:", data);
-            res.status(201).send("Done!");
-          } else {
-            const userId = await createNewUser(newTodo);
-            res.cookie("userID", userId, {
-              maxAge: 900000,
-              httpOnly: true,
-            });
-            res
-              .status(404)
-              .send("User id does not match, we created a new UserId for you!");
-          }
-        } catch (e) {
-          console.error(e.message);
-          res.status(400).send("Failed!");
-        }
-      });
-
-      app.post("/updatestatus", async (req, res) => {
-        try {
-          const userID = req.cookies.userID || "";
-          const new_obj = { index: req.body.index, status: req.body.status };
-          const data = await updateStatus(userID, new_obj);
-
-          if (data) {
-            res.status(201).send("Success!");
-          } else {
-            res.status(404).send("User not found or index not valid!");
-          }
-        } catch (error) {
-          console.error(error.message);
-          res.status(400).send("Failed!");
-        }
-      });
-
-      app.delete("/deleteTodo", async (req, res) => {
-        try {
-          const userID = req.cookies.userID || "";
-          const indexes = req.body.indexes;
-
-          const success = await deleteTodo(userID, indexes); // Call the updated function
-
-          if (success !== null) {
-            res.status(200).send("Elements deleted successfully!"); // Use 200 for successful deletion
-          } else {
-            res
-              .status(404)
-              .send("Todo not found or no elements matched the indexes!");
-          }
-        } catch (error) {
-          console.error(error.message);
-          res.status(500).send("Internal server error!"); // Use 500 for server-side errors
-        }
-      });
-
-      app.listen(PORT, () => {
-        console.log(`Server listening on port ${PORT}`);
-      });
-    })
-    .catch((err) => {
-      console.log(`Connection to mongodb databes failed! ${err.message}`);
-      setTimeout(() => connectToDatabase(), 500);
-    });
+const createNewTodo = (description, status) => {
+  return {
+    todos: [{ description: description, status: status }],
+  };
 };
 
-connectToDatabase();
+async function validateUser(userId) {
+  try {
+    const IsValid = await Todo.findById(userId);
+    if (IsValid !== null) {
+      console.log("userId found!");
+      return true;
+    } else {
+      console.log("userId Not found!");
+      return false;
+    }
+  } catch (error) {
+    console.log("Error while verifying userId: ", error);
+  }
+}
+
+async function createNewUser(newTodo) {
+  try {
+    // const newTodo = { todos: [] };
+    const document = await Todo.create(newTodo);
+    console.log("New User created: userID", document._id);
+    return document._id;
+  } catch (error) {
+    console.log("Could not get user's todo data: ", error);
+    return null;
+  }
+}
+
+async function getUsersTodoData(userId) {
+  try {
+    const todos = await Todo.findById(userId, "todos");
+    console.log("User's todo data: ", todos);
+    return todos;
+  } catch (error) {
+    console.log("Could not get user's todo data: ", error);
+    return null;
+  }
+}
+
+async function addUsersNewTodoData(userId, newTodo) {
+  try {
+    const result = await Todo.updateOne(
+      { _id: userId },
+      { $push: { todos: newTodo.todos } }
+    );
+    console.log(result);
+    if (result.modifiedCount === 1) {
+      console.log("New entry added successfully.");
+      return true;
+    } else {
+      console.log(
+        "Failed to add new entry. Document not found or no modification made."
+      );
+      return false;
+    }
+  } catch (error) {
+    console.log("Could not add new todo to user's data: ", error);
+    return false;
+  }
+}
+
+async function saveTodosArray(userId, newTodosArray) {
+  try {
+    const result = await Todo.updateOne(
+      { _id: userId },
+      { $set: { todos: newTodosArray } }
+    );
+    if (result) {
+      return true;
+    } else {
+      console.log("could not save new Todos array");
+      return false;
+    }
+  } catch (error) {
+    console.log("Error occured while saving the new todos array");
+    console.log(error);
+    return false;
+  }
+}
+
+function updateAndReturnNewTodosArray(Todos = [], index) {
+  if (index >= Todos.length) {
+    return Todos;
+  }
+  console.log(Todos);
+  Todos[index].status = !Todos[index].status;
+  return Todos;
+}
+
+function deleteAndReturnNewTodosArray(todos, indexes) {
+  const NewTododsArray = []
+  let k = indexes.length-1;
+  for (let i = 0; i < todos.length; i++) {
+    if(k >= 0 && i === indexes[k])
+    {
+      k--;
+    }
+    else
+    {
+      NewTododsArray.push(todos[i]);
+    }
+  }
+  return NewTododsArray;
+}
+
+async function updateUsersTodoData(userId, index) {
+  try {
+    const todos = await getUsersTodoData(userId);
+    if (todos !== null) {
+      const TodosArray = updateAndReturnNewTodosArray(todos.todos, index);
+      const savedSuccessfully = await saveTodosArray(userId, TodosArray);
+      return savedSuccessfully;
+    } else {
+      return false;
+    }
+  } catch (error) {
+    console.log("Could not update user's todo data: ", error);
+    return false;
+  }
+}
+
+async function deleteUsersTodoData(userId, indexes) {
+  try {
+    const todos = await getUsersTodoData(userId);
+    if (todos !== null) {
+      const Todos = deleteAndReturnNewTodosArray(todos.todos, indexes);
+      const savedSuccessfully = await saveTodosArray(userId, Todos);
+      return savedSuccessfully;
+    } else {
+      return false;
+    }
+  } catch (error) {
+    console.log("Could not delete user's todo data: ", error);
+    return false;
+  }
+}
+
+app.get("/get", async (req, res) => {
+  try {
+    const userId = req.query.userId;
+    // console.log(req.data);
+    console.log('incoming userId:', userId);
+    // UserId exists
+    if (userId !== "") {
+      try {
+        const data = await getUsersTodoData(userId);
+        console.log("successfully processed /get request");
+        res.status(201).json({ userId: userId, todos: data.todos });
+      } catch (error) {
+        console.log("error occured while processing /get request", error);
+        res.status(400);
+      }
+    } else {
+      // Create new user.
+      try {
+        const id = await createNewUser({ todos: [] });
+        console.log("New User created: userID", id);
+        res.status(201).json({ userId: id, todos: [] });
+      } catch (error) {
+        console.log("error occured while processing /get request");
+        console.log("could not create new user");
+        console.log("error:", error);
+        res.status(400);
+      }
+    }
+  } catch (error) {
+    console.log("Could not complete /get request: ", error);
+    res.status(400);
+  }
+});
+
+app.post("/add", async (req, res) => {
+  console.log(req.body);
+  try {
+    const userId = req.body.userId;
+    const newTodo = createNewTodo(req.body.description, req.body.status);
+    const isValidUser = await validateUser(userId);
+    if (isValidUser) {
+      const IsAdded = await addUsersNewTodoData(userId, newTodo);
+      if (IsAdded) {
+        res.status(201).json({ userId: userId });
+      } else {
+        res.status(400).send("Could not add todo nor update database!");
+      }
+    } else {
+      const id = await createNewUser(newTodo);
+      res.status(201).json({ userId: id });
+    }
+  } catch (error) {
+    console.log("Error while processing /add request", error);
+    res.status(400).send("Error while processing /add request");
+  }
+});
+
+app.post("/update", async (req, res) => {
+  try {
+    const userId = req.body.userId;
+    const isValidUser = await validateUser(userId);
+    if (isValidUser) {
+      const updated = await updateUsersTodoData(userId, req.body.index);
+      if (updated) {
+        res.status(201).json({ userId: userId });
+      } else {
+        res.status(400).send("Could not update todo in the database!");
+      }
+    } else {
+      const id = await createNewUser(newTodo);
+      res.status(201).json({ userId: userId });
+    }
+  } catch (error) {
+    console.log("Error while processing /update request", error);
+    res.status(400).send("Error while processing /update request");
+  }
+});
+
+app.delete("/delete", async (req, res) => {
+  // console.log(req.body);
+  try {
+    const userId = req.body.userId;
+    const isValidUser = await validateUser(userId);
+    if (isValidUser) {
+      const updated = await deleteUsersTodoData(userId, req.body.indexes);
+      if (updated) {
+        res.status(201).json({ userId: userId });
+      } else {
+        res.status(400).send("Could not delete todo/todos in the database!");
+      }
+    } else {
+      const id = await createNewUser(newTodo);
+      res.status(201).json({ userId: userId });
+    }
+  } catch (error) {
+    console.log("Error while processing /delete request", error);
+    res.status(400).send("Error while processing /delete request");
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server listening on PORT ${PORT}`);
+});
