@@ -3,18 +3,12 @@ const Todo = require("./schema/Todo");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 
-// const mongoose = require("mongoose");
-
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
-// {
-//   origin: "http://localhost:5173",
-//   credentials: true,
-// }
 
 const createNewTodo = (description, status) => {
   return {
@@ -39,7 +33,6 @@ async function validateUser(userId) {
 
 async function createNewUser(newTodo) {
   try {
-    // const newTodo = { todos: [] };
     const document = await Todo.create(newTodo);
     console.log("New User created: userID", document._id);
     return document._id;
@@ -158,7 +151,7 @@ async function deleteUsersTodoData(userId, indexes) {
   }
 }
 
-app.get("/get", async (req, res) => {
+app.get("/api/get", async (req, res) => {
   try {
     const userId = req.query.userId;
     // console.log(req.data);
@@ -192,7 +185,7 @@ app.get("/get", async (req, res) => {
   }
 });
 
-app.post("/add", async (req, res) => {
+app.post("/api/add", async (req, res) => {
   console.log(req.body);
   try {
     const userId = req.body.userId;
@@ -215,7 +208,7 @@ app.post("/add", async (req, res) => {
   }
 });
 
-app.post("/update", async (req, res) => {
+app.post("/api/update", async (req, res) => {
   try {
     const userId = req.body.userId;
     const isValidUser = await validateUser(userId);
@@ -236,7 +229,7 @@ app.post("/update", async (req, res) => {
   }
 });
 
-app.delete("/delete", async (req, res) => {
+app.delete("/api/delete", async (req, res) => {
   // console.log(req.body);
   try {
     const userId = req.body.userId;
