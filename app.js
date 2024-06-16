@@ -1,10 +1,12 @@
+require("dotenv").config();
+
 const express = require("express");
 const Todo = require("./schema/Todo");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8000;
 
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
@@ -104,15 +106,12 @@ function updateAndReturnNewTodosArray(Todos = [], index) {
 }
 
 function deleteAndReturnNewTodosArray(todos, indexes) {
-  const NewTododsArray = []
-  let k = indexes.length-1;
+  const NewTododsArray = [];
+  let k = indexes.length - 1;
   for (let i = 0; i < todos.length; i++) {
-    if(k >= 0 && i === indexes[k])
-    {
+    if (k >= 0 && i === indexes[k]) {
       k--;
-    }
-    else
-    {
+    } else {
       NewTododsArray.push(todos[i]);
     }
   }
@@ -155,7 +154,7 @@ app.get("/api/get", async (req, res) => {
   try {
     const userId = req.query.userId;
     // console.log(req.data);
-    console.log('incoming userId:', userId);
+    console.log("incoming userId:", userId);
     // UserId exists
     if (userId !== "") {
       try {

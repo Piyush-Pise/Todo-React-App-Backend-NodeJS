@@ -1,7 +1,6 @@
 const { response } = require("express");
 const mongoose = require("mongoose");
-const dbURI =
-  "mongodb+srv://TestingCluster:mcwAiyEJy5UfFStm@testcluster0.nagygwb.mongodb.net/?retryWrites=true&w=majority";
+const dbURI = process.env.MongoDBURL;
 const config = {};
 let connection;
 try {
